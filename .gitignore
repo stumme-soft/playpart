@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Application data (uploaded tracks, stems, SQLite db, model cache)
+data/
+appdata/
+
+# Frontend
+frontend/node_modules/
+frontend/.svelte-kit/
+frontend/build/
+
+# Env / local
+*.env*
+.env.development
+.DS_Store
+Thumbs.db

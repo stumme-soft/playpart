@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Ludovic Stumme
+services:
+  playpart:
+    build:
+      context: .
+      args:
+        TORCH_INDEX: https://download.pytorch.org/whl/cpu
+    image: ghcr.io/stumme-soft/playpart-cpu:latest
+    container_name: playpart
+    ports:
+      - "8765:8765"
+    volumes:
+      - ./appdata:/data
+    restart: unless-stopped
+    # No GPU: the app detects the absence of CUDA and falls back to CPU
+    # (with shifts=1 to keep extraction times reasonable).

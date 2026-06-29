@@ -1,0 +1,10 @@
+**/node_modules
+**/.svelte-kit
+frontend/build
+data
+appdata
+**/__pycache__
+*.pyc
+.git
+.gitignore
+*.env*

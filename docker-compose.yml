@@ -1,0 +1,26 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Ludovic Stumme
+services:
+  playpart:
+    build:
+      context: .
+      args:
+        # cu124 = GPU-capable. For a CPU-only host build a lean image with:
+        #   TORCH_INDEX: https://download.pytorch.org/whl/cpu
+        TORCH_INDEX: https://download.pytorch.org/whl/cu124
+    image: ghcr.io/stumme-soft/playpart-gpu:latest
+    container_name: playpart
+    ports:
+      - "8765:8765"
+    volumes:
+      - ./appdata:/data
+    restart: unless-stopped
+    # GPU support requires the NVIDIA Container Toolkit on the host.
+    # Remove or comment out this whole `deploy` block for a CPU-only host.
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
