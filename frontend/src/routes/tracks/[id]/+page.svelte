@@ -145,7 +145,16 @@ Copyright (c) 2026 Ludovic Stumme
     if (noteSaveTimer) clearTimeout(noteSaveTimer);
     if (keySaveTimer) clearTimeout(keySaveTimer);
     if (mixSaveTimer) clearTimeout(mixSaveTimer);
-    for (const a of Object.values(audios)) a.pause();
+    // pause() stops playback but doesn't cancel in-flight network requests.
+    // Clearing src and calling load() forces the browser to abort the wav
+    // downloads immediately — otherwise the next page fetches (tracks /
+    // folders / stems for another track) queue behind ~300 MB of pending
+    // audio loads on the same origin.
+    for (const a of Object.values(audios)) {
+      a.pause();
+      a.removeAttribute('src');
+      a.load();
+    }
   });
 
   // Persist master / volumes / mutes (debounced) once the initial mix has loaded.
