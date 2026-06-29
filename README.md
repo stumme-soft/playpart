@@ -5,7 +5,7 @@
 
 <h1 align="center">PlayPart</h1>
 
-<p align="center"><em>Extrais · Supprime · Joue</em></p>
+<p align="center"><em>Extract · Mute · Play</em></p>
 
 <p align="center">
   A self-hosted web app for musicians who want to practice songs by separating them
