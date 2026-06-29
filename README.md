@@ -52,29 +52,60 @@ or NAS. No accounts, no cloud, no telemetry.
 
 **Audio analysis**
 - Auto-detected **tempo** (`librosa.beat.beat_track`)
-- Auto-detected **key** (Krumhansl-Schmuckler), editable from the UI
+- Auto-detected **key** (Krumhansl-Schmuckler) in standard short notation (`Em`, `G`,
+  `F#m`…), editable from the UI
+
+**Interface**
+- Web UI in **English** and **French**, auto-detected from the browser, switchable
+  from the header
+- Mobile-friendly — desktop, tablet and phone
 
 **Hardware**
 - Uses an NVIDIA GPU automatically when available, falls back to CPU otherwise
 - On CPU, the extraction defaults to `shifts=1` to keep jobs bearable; overridable
   via the `DEMUCS_SHIFTS` env var
 
-## Quick start (Docker)
+## Quick start
 
-Two pre-built variants live behind two compose files. Pick the one matching your host:
+Pre-built images are published on **GitHub Container Registry** on every release —
+one `docker run` and you're up, no clone, no build.
 
 ```bash
-# CPU-only host
-docker compose -f docker-compose.cpu.yml up -d --build
+# CPU-only server
+docker run -d --name playpart --restart unless-stopped \
+  -p 8765:8765 \
+  -v playpart-data:/data \
+  ghcr.io/stumme-soft/playpart-cpu:latest
 
-# GPU host (requires the NVIDIA Container Toolkit)
-docker compose up -d --build
+# Server with an NVIDIA GPU (needs the NVIDIA Container Toolkit)
+docker run -d --name playpart --restart unless-stopped \
+  -p 8765:8765 --gpus all \
+  -v playpart-data:/data \
+  ghcr.io/stumme-soft/playpart-gpu:latest
 ```
 
 Then open **http://&lt;host&gt;:8765** from any device on the LAN.
 
-The container persists everything (uploaded tracks, stems, SQLite db, demucs model
-cache) in a single volume — by default `./appdata` next to the compose file.
+Uploaded tracks, extracted stems, the SQLite database and the model cache all live
+in the `playpart-data` Docker volume — managed by Docker, persists across container
+restarts.
+
+### Available tags
+
+`:latest` (rolling), `:0.1.0` (specific release), `:0.1` (last patch on the 0.1 line).
+
+### Using docker compose
+
+The repository also ships `docker-compose.yml` (GPU) and `docker-compose.cpu.yml`
+(CPU) for those who prefer compose:
+
+```bash
+git clone https://github.com/stumme-soft/playpart && cd playpart
+docker compose -f docker-compose.cpu.yml pull
+docker compose -f docker-compose.cpu.yml up -d
+```
+
+Add `--build` to the `up` command to build from source instead of pulling.
 
 ## Local development
 
