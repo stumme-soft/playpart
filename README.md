@@ -1,6 +1,6 @@
 <!-- SPDX-License-Identifier: MIT -->
 <p align="center">
-  <img src="[frontend/static/favicon.png](https://www.playpart.fr/favicon.png)" alt="PlayPart" width="120" />
+  <img src="https://www.playpart.fr/favicon.png" alt="PlayPart" width="120" />
 </p>
 
 <h1 align="center">PlayPart</h1>
