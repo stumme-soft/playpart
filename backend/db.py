@@ -138,6 +138,14 @@ def list_tracks(folder_id: Optional[str] = None) -> list[dict]:
         return [dict(r) for r in rows]
 
 
+def list_track_ids_by_status(status: str) -> list[str]:
+    with _conn() as c:
+        rows = c.execute(
+            "SELECT id FROM tracks WHERE status = ? ORDER BY created_at", (status,)
+        ).fetchall()
+        return [r["id"] for r in rows]
+
+
 def delete_track(track_id: str) -> None:
     with _conn() as c:
         c.execute("DELETE FROM tracks WHERE id = ?", (track_id,))

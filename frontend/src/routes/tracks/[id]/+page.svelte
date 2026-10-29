@@ -30,6 +30,7 @@ Copyright (c) 2026 Ludovic Stumme
   let countdownLeft = $state(0);
   let countdownTimer = null;
   let rafId = null;
+  let clickCtx = null; // AudioContext for the count-in, created once and reused
 
   // Per-track note (guitar / FX settings)
   let note = $state('');
@@ -145,6 +146,7 @@ Copyright (c) 2026 Ludovic Stumme
     if (noteSaveTimer) clearTimeout(noteSaveTimer);
     if (keySaveTimer) clearTimeout(keySaveTimer);
     if (mixSaveTimer) clearTimeout(mixSaveTimer);
+    if (clickCtx) clickCtx.close();
     // pause() stops playback but doesn't cancel in-flight network requests.
     // Clearing src and calling load() forces the browser to abort the wav
     // downloads immediately — otherwise the next page fetches (tracks /
@@ -193,8 +195,12 @@ Copyright (c) 2026 Ludovic Stumme
     if (!track.bpm) return playAll();
     pauseAll();
     seekTo(0);
-    const Ctx = window.AudioContext || window.webkitAudioContext;
-    const ctx = new Ctx();
+    // Browsers cap the number of live AudioContexts: reuse a single one.
+    if (!clickCtx) {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      clickCtx = new Ctx();
+    }
+    const ctx = clickCtx;
     if (ctx.state === 'suspended') await ctx.resume();
     const beats = 4;
     scheduleClicks(ctx, track.bpm, beats, ctx.currentTime + 0.05);
@@ -253,7 +259,11 @@ Copyright (c) 2026 Ludovic Stumme
   // Playback speed (pitch preserved)
   function setSpeed(r) {
     speed = r;
-    for (const a of Object.values(audios)) a.playbackRate = r;
+    for (const a of Object.values(audios)) {
+      // load() (on pitch change) resets playbackRate to defaultPlaybackRate.
+      a.defaultPlaybackRate = r;
+      a.playbackRate = r;
+    }
   }
 
   // Pitch shift (whole song, drums excluded). Server renders the stems and
@@ -298,7 +308,10 @@ Copyright (c) 2026 Ludovic Stumme
         a.src = url;
         a.load();
       })));
-      for (const a of Object.values(audios)) a.currentTime = time;
+      for (const a of Object.values(audios)) {
+        a.currentTime = time;
+        a.playbackRate = speed;
+      }
       if (wasPlaying) await playAll();
     } catch (e) {
       loadError = t('mixer.pitch_failed', { error: String(e) });

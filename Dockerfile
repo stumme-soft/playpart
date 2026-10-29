@@ -20,7 +20,8 @@ ARG TORCH_INDEX=https://download.pytorch.org/whl/cu124
 
 ENV PYTHONUNBUFFERED=1 \
     MUSICAPP_DATA=/data \
-    TORCH_HOME=/data/torch_cache
+    TORCH_HOME=/data/torch_cache \
+    HF_HOME=/data/hf_cache
 
 WORKDIR /app
 
@@ -29,11 +30,11 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 COPY backend/requirements.txt ./backend/requirements.txt
-# torch and torchaudio versions must match exactly or torchaudio import fails.
-RUN pip install --no-cache-dir torch==2.6.0 torchaudio==2.6.0 --index-url ${TORCH_INDEX} \
+# demucs >= 4.1 decodes audio without torchaudio: torch alone is enough.
+RUN pip install --no-cache-dir torch==2.6.0 --index-url ${TORCH_INDEX} \
     && pip install --no-cache-dir -r backend/requirements.txt
 # Fail the build early if the audio stack can't import (e.g. version mismatch).
-RUN python -c "import torch, torchaudio, demucs, librosa, soundfile; print('audio stack OK')"
+RUN python -c "import torch, demucs, librosa, soundfile; print('audio stack OK')"
 
 COPY backend/ ./backend/
 COPY --from=frontend /app/frontend/build ./frontend/build

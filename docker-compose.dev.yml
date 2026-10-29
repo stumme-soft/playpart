@@ -1,0 +1,35 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Ludovic Stumme
+#
+# Development environment: toolchain in a container, sources bind-mounted.
+# Driven by the Makefile (`make help`), which exports UID/GID so files created
+# in the containers belong to the host user. Host ports can be changed with
+# BACKEND_PORT / FRONTEND_PORT (e.g. `make dev BACKEND_PORT=18765`).
+x-dev: &dev
+  build:
+    context: .
+    dockerfile: Dockerfile.dev
+  image: playpart-dev:latest
+  user: "${UID:-1000}:${GID:-1000}"
+  volumes:
+    - .:/app
+
+services:
+  backend:
+    <<: *dev
+    command: uvicorn backend.main:app --host 0.0.0.0 --port 8765 --reload --reload-dir backend
+    ports:
+      - "${BACKEND_PORT:-8765}:8765"
+
+  frontend:
+    <<: *dev
+    working_dir: /app/frontend
+    command: npm run dev -- --host 0.0.0.0
+    ports:
+      - "${FRONTEND_PORT:-5173}:5173"
+    environment:
+      # Overrides frontend/.env.development: the browser reaches the API
+      # through the host port.
+      VITE_API_URL: http://localhost:${BACKEND_PORT:-8765}
+    depends_on:
+      - backend

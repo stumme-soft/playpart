@@ -1,0 +1,47 @@
+# syntax=docker/dockerfile:1
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Ludovic Stumme
+
+# Development / build toolbox: same Python and Node versions as the production
+# Dockerfile, so nothing has to be installed on the host. The source tree is
+# bind-mounted at /app (see docker-compose.dev.yml); this image only holds the
+# toolchain and the Python dependencies. Use it through the Makefile.
+
+FROM node:24-slim AS node
+
+FROM python:3.11-slim
+
+# CPU torch by default (lean). Pass the cu124 index for a GPU dev host.
+ARG TORCH_INDEX=https://download.pytorch.org/whl/cpu
+
+# Containers run with the host UID (no matching passwd entry): point HOME and
+# the caches at writable locations.
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    HOME=/tmp/home \
+    npm_config_cache=/tmp/home/.npm \
+    npm_config_update_notifier=false \
+    MUSICAPP_DATA=/app/data \
+    TORCH_HOME=/app/data/torch_cache \
+    HF_HOME=/app/data/hf_cache
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ffmpeg git make \
+    && rm -rf /var/lib/apt/lists/*
+
+# Node 24 + npm, copied from the official image (same version as the frontend
+# build stage of the production Dockerfile).
+COPY --from=node /usr/local/bin/node /usr/local/bin/node
+COPY --from=node /usr/local/lib/node_modules /usr/local/lib/node_modules
+RUN ln -s ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
+    && ln -s ../lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx
+
+COPY backend/requirements.txt /tmp/requirements.txt
+# demucs >= 4.1 decodes audio without torchaudio: torch alone is enough.
+RUN pip install --no-cache-dir torch==2.6.0 --index-url ${TORCH_INDEX} \
+    && pip install --no-cache-dir -r /tmp/requirements.txt \
+    && python -c "import torch, demucs, librosa, soundfile; print('audio stack OK')"
+
+RUN mkdir -p /tmp/home && chmod 1777 /tmp/home
+
+WORKDIR /app

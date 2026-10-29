@@ -109,20 +109,23 @@ Add `--build` to the `up` command to build from source instead of pulling.
 
 ## Local development
 
-```bash
-# 1. Backend
-pip install -r backend/requirements.txt
-uvicorn backend.main:app --host 0.0.0.0 --port 8765 --reload
+The whole toolchain (Python 3.11, Node 24, torch CPU, ffmpeg) lives in a dev
+container, so the only host requirements are **Docker** and **make**. The sources
+are bind-mounted, and the containers run with your UID so the files they create
+belong to you.
 
-# 2. Frontend (in another terminal)
-cd frontend
-npm install
-npm run dev      # Vite dev server with HMR on :5173
+```bash
+make image      # build the dev toolbox image (once, or when requirements change)
+make install    # npm ci in frontend/
+make dev        # backend on :8765 (auto-reload) + Vite dev server with HMR on :5173
 ```
 
-When you're done iterating, `npm run build` produces a static bundle in
-`frontend/build/` that the FastAPI process serves automatically on the same port as
-the API.
+Then open **http://localhost:5173**. If a port is already taken on your machine:
+`make dev BACKEND_PORT=18765 FRONTEND_PORT=15173`.
+
+`make build` produces the static bundle in `frontend/build/`, which the FastAPI
+process serves on the same port as the API. `make image-cpu` / `make image-gpu`
+build the production images locally. `make help` lists all targets.
 
 ## Stack
 

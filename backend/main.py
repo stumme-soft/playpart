@@ -8,6 +8,7 @@ import json
 import mimetypes
 import os
 import shutil
+import threading
 from concurrent.futures import Future, ProcessPoolExecutor
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -40,6 +41,14 @@ async def lifespan(app: FastAPI):
     app.state.executor = ProcessPoolExecutor(
         max_workers=1, initializer=tasks.worker_init
     )
+    # Jobs don't survive a restart: re-queue tracks left 'pending' by a
+    # previous process, otherwise they'd stay pending forever.
+    for track_id in db.list_track_ids_by_status("pending"):
+        audio = next(TRACKS_DIR.glob(f"{track_id}.*"), None)
+        if audio:
+            _submit_job(track_id, audio)
+        else:
+            db.update_status(track_id, "error", "Audio file missing")
     try:
         yield
     finally:
@@ -55,7 +64,26 @@ app.add_middleware(
 )
 
 
+# Separation jobs in flight, so deleting a track can cancel its queued job.
+_jobs: dict[str, Future] = {}
+
+
+def _submit_job(track_id: str, audio_path: Path) -> None:
+    fut = app.state.executor.submit(
+        tasks.process_track, str(audio_path), str(STEMS_DIR / track_id)
+    )
+    _jobs[track_id] = fut
+    fut.add_done_callback(lambda f: _on_job_done(track_id, f))
+
+
 def _on_job_done(track_id: str, fut: Future) -> None:
+    _jobs.pop(track_id, None)
+    if not db.get_track(track_id):
+        # Track deleted while the job was running: drop the stems it wrote.
+        shutil.rmtree(STEMS_DIR / track_id, ignore_errors=True)
+        return
+    if fut.cancelled():
+        return
     try:
         result = fut.result()
         db.update_metadata(track_id, result["bpm"], result["duration"], result.get("key"))
@@ -119,12 +147,7 @@ async def upload_track(
     track_id = db.insert_track(file.filename, folder_id)
     audio_path = TRACKS_DIR / f"{track_id}{ext}"
     audio_path.write_bytes(await file.read())
-    stems_dir = STEMS_DIR / track_id
-
-    fut = app.state.executor.submit(
-        tasks.process_track, str(audio_path), str(stems_dir)
-    )
-    fut.add_done_callback(lambda f: _on_job_done(track_id, f))
+    _submit_job(track_id, audio_path)
     return _track_out(db.get_track(track_id))
 
 
@@ -180,6 +203,10 @@ def get_track(track_id: str):
 
 _PITCH_RANGE = 6
 
+# One lock per pitched file so concurrent requests render it only once.
+_pitch_locks: dict[Path, threading.Lock] = {}
+_pitch_locks_guard = threading.Lock()
+
 
 @app.get("/api/tracks/{track_id}/stems/{stem_name}")
 def get_stem(track_id: str, stem_name: str, pitch: int = 0):
@@ -193,7 +220,11 @@ def get_stem(track_id: str, stem_name: str, pitch: int = 0):
     sign = "+" if pitch > 0 else "-"
     pitched = base / f"p{sign}{abs(pitch)}" / f"{stem_name}.wav"
     if not pitched.is_file():
-        tasks.render_pitch_shifted(str(original), pitched, pitch)
+        with _pitch_locks_guard:
+            lock = _pitch_locks.setdefault(pitched, threading.Lock())
+        with lock:
+            if not pitched.is_file():
+                tasks.render_pitch_shifted(str(original), pitched, pitch)
     return FileResponse(pitched, media_type="audio/wav")
 
 
@@ -202,6 +233,11 @@ def delete_track(track_id: str):
     track = db.get_track(track_id)
     if not track:
         raise HTTPException(404, "Track not found")
+    # A queued job is cancelled; a running one can't be, and _on_job_done
+    # cleans up its stems once it finishes.
+    fut = _jobs.get(track_id)
+    if fut:
+        fut.cancel()
     stems_dir = STEMS_DIR / track_id
     if stems_dir.is_dir():
         shutil.rmtree(stems_dir)

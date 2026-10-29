@@ -1,6 +1,6 @@
 [project]
 name = "playpart"
-version = "0.1.1"
+version = "0.1.2"
 description = "Music stem separation and remixing web app (LAN, no auth)"
 license = "MIT"
 authors = [{ name = "Ludovic Stumme" }]
@@ -10,7 +10,7 @@ dependencies = [
     "uvicorn[standard]>=0.32",
     "python-multipart>=0.0.20",
     "librosa>=0.10",
-    "demucs>=4.0.1",
+    "demucs==4.1.0",
     "soundfile>=0.13",
 ]
 
